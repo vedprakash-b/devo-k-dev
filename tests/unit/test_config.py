@@ -15,6 +15,7 @@ def make_settings(**overrides: Any) -> Settings:
 
 def test_defaults_point_at_the_local_stack(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("DEVOKDEV_REDIS_URL", raising=False)
+    monkeypatch.delenv("DEVOKDEV_ENV", raising=False)
     settings = make_settings()
     assert settings.redis_url == "redis://127.0.0.1:6379/0"
     assert settings.temporal_address == "127.0.0.1:7233"
