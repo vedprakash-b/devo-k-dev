@@ -1,0 +1,60 @@
+# Devo-K-Dev local stack: Temporal dev server, PostgreSQL + pgvector, Redis.
+# Run from the repo root:  make up   (or: docker compose --env-file .env -f deploy/docker-compose.yml up -d --wait)
+#
+# Every port is published on 127.0.0.1 only, so nothing is reachable from your network.
+# Image versions are pinned; change them deliberately and log the change in docs/adr/.
+name: devokdev
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_USER: ${DEVOKDEV_POSTGRES_USER:-devokdev}
+      POSTGRES_PASSWORD: ${DEVOKDEV_POSTGRES_PASSWORD:?set DEVOKDEV_POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${DEVOKDEV_POSTGRES_DB:-devokdev}
+    ports:
+      - "127.0.0.1:${DEVOKDEV_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.8.3-alpine
+    # Append-only file: quota counters and the event stream survive a restart.
+    command: ["redis-server", "--appendonly", "yes", "--save", ""]
+    ports:
+      - "127.0.0.1:${DEVOKDEV_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/temporal:1.9.1
+    # The CLI's development server: Temporal service, SQLite and the Web UI in one process.
+    # State is in memory for M0 (ADR-036): `make down` clears workflow history.
+    command: ["server", "start-dev", "--ip", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:7233:7233"   # gRPC: workers and clients
+      - "127.0.0.1:8233:8233"   # Web UI
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
