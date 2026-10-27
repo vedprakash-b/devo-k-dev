@@ -1,0 +1,4 @@
+# Keep Linux line endings in the repo even when files are touched from Windows.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

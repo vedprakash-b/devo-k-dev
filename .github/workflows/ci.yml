@@ -1,0 +1,103 @@
+# Runs on every pull request and every push to main. All four jobs must pass to merge.
+# Actions are pinned to full commit SHAs; the tag is in the comment (ADR-037).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_LOCKED: "1"           # fail if uv.lock is out of date with pyproject.toml
+  DEVOKDEV_ENV: ci
+  DEVOKDEV_LOG_FORMAT: json
+
+jobs:
+  quality:
+    name: Lint, types, unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github .
+      - name: Ruff format
+        run: uv run ruff format --check .
+      - name: mypy (strict)
+        run: uv run mypy
+      - name: pytest with coverage
+        run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 14
+
+  integration:
+    name: Integration tests on the real stack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync
+      - name: Start the stack
+        run: |
+          cp .env.example .env
+          docker compose --env-file .env -f deploy/docker-compose.yml up -d --wait
+      - name: devokdev doctor
+        run: uv run devokdev doctor
+      - name: Integration tests
+        run: uv run pytest --run-integration tests/integration
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose --env-file .env -f deploy/docker-compose.yml logs --no-color
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0       # scan the whole history, not just the last commit
+      - name: Install gitleaks (checksum-verified release binary)
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          curl -sSfL -o gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum --check -
+          tar xzf gitleaks.tgz gitleaks
+      - name: Scan the full history
+        run: ./gitleaks git . --redact --verbose --exit-code 1
+
+  dependencies:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          python-version: "3.12"
+      - name: Export the locked dependency set with hashes
+        run: uv export --format requirements-txt --no-emit-project --output-file requirements.lock.txt
+      - name: Audit against known vulnerabilities
+        run: uvx --from pip-audit==2.10.1 pip-audit --disable-pip --strict -r requirements.lock.txt
