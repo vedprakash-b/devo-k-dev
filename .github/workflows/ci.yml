@@ -39,6 +39,11 @@ jobs:
         run: uv run mypy
       - name: pytest with coverage
         run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
+      # The M0 lesson: a unit test must not depend on the CI environment. Run them again
+      # without DEVOKDEV_ENV=ci; the autouse fixture in tests/conftest.py should make both
+      # runs identical.
+      - name: pytest without the CI environment
+        run: env -u DEVOKDEV_ENV uv run pytest -q -p no:cacheprovider tests/unit
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: coverage-xml
@@ -62,8 +67,10 @@ jobs:
           docker compose --env-file .env -f deploy/docker-compose.yml up -d --wait
       - name: devokdev doctor
         run: uv run devokdev doctor
+      # Every test marked integration, wherever it lives: the stack checks, the Redis half
+      # of the router-state contract tests, shared state across workers, and the sandbox.
       - name: Integration tests
-        run: uv run pytest --run-integration tests/integration
+        run: uv run pytest --run-integration -m integration
       - name: Stack logs on failure
         if: failure()
         run: docker compose --env-file .env -f deploy/docker-compose.yml logs --no-color

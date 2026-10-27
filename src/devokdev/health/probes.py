@@ -110,15 +110,33 @@ def make_temporal_check(settings: Settings) -> HealthCheck:
 
 
 def make_provider_keys_check(settings: Settings) -> HealthCheck:
-    """Only a warning: keys are not needed until M1."""
+    """Only a warning: the stack runs without keys, but no model can be called."""
 
     async def probe() -> Outcome:
         providers = settings.configured_providers()
         if not providers:
-            return Outcome(Status.WARN, "no model provider keys yet (needed from M1)")
+            return Outcome(
+                Status.WARN, "no provider keys yet; see docs/learning/M1.md 'Getting free keys'"
+            )
         return Outcome(Status.OK, f"{len(providers)} configured: {', '.join(providers)}")
 
     return HealthCheck("Model provider keys", probe, required=False)
+
+
+def make_registry_check(settings: Settings) -> HealthCheck:
+    """config/models.yaml must load: the router cannot start without it."""
+
+    async def probe() -> Outcome:
+        from devokdev.llm.registry import Registry
+
+        registry = Registry.load(settings.models_file)
+        usable = registry.usable_models(settings)
+        summary = f"{len(registry.models)} models, {len(usable)} usable"
+        if not usable:
+            return Outcome(Status.WARN, f"{summary}: add a provider key to .env")
+        return Outcome(Status.OK, summary)
+
+    return HealthCheck("Model registry", probe)
 
 
 def default_checks(settings: Settings) -> list[HealthCheck]:
@@ -128,5 +146,6 @@ def default_checks(settings: Settings) -> list[HealthCheck]:
         make_postgres_check(settings),
         make_redis_check(settings),
         make_temporal_check(settings),
+        make_registry_check(settings),
         make_provider_keys_check(settings),
     ]

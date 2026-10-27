@@ -22,6 +22,8 @@ dependencies = [
     "redis>=8.1,<9",
     "psycopg[binary]>=3.3,<4",
     "structlog>=26.1",
+    "httpx>=0.28,<1",
+    "pyyaml>=6.0.2,<7",
 ]
 
 [project.scripts]
@@ -36,6 +38,7 @@ dev = [
     "pytest-cov>=7.1",
     "hypothesis>=6.152",
     "pre-commit>=4.7",
+    "types-pyyaml>=6.0",
 ]
 
 [build-system]

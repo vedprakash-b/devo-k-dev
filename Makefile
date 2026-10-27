@@ -4,7 +4,7 @@
 COMPOSE := docker compose --env-file .env -f deploy/docker-compose.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help setup env up down reset logs ps doctor smoke fmt lint typecheck test test-integration check
+.PHONY: help setup env up down reset logs ps doctor smoke fmt lint typecheck test test-integration check demo models
 
 help: ## List the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -38,6 +38,12 @@ doctor: ## Check that everything Devo-K-Dev needs is reachable
 smoke: ## Run a tiny Temporal workflow end to end
 	uv run devokdev smoke
 
+demo: ## Watch the router hand a conversation over after a 429 (offline, no keys)
+	uv run devokdev models demo
+
+models: ## List the model registry and which models your keys unlock
+	uv run devokdev models list
+
 fmt: ## Format and auto-fix
 	uv run ruff format .
 	uv run ruff check --fix .
@@ -53,6 +59,6 @@ test: ## Unit tests with coverage
 	uv run pytest --cov --cov-report=term-missing
 
 test-integration: ## Integration tests against the running stack (make up first)
-	uv run pytest --run-integration tests/integration
+	uv run pytest --run-integration -m integration
 
 check: lint typecheck test ## Everything CI runs on every pull request

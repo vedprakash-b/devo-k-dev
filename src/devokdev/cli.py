@@ -1,9 +1,9 @@
 """The `devokdev` command line.
 
-M0 ships three commands:
   devokdev version   print the version
   devokdev doctor    check that the local stack and configuration are healthy
   devokdev smoke     run a tiny Temporal workflow end to end
+  devokdev models    model registry, router and fitness check (M1; see cli_models.py)
 Later milestones add new, status, pause, resume and replay.
 """
 
@@ -17,6 +17,7 @@ from rich.console import Console
 from rich.table import Table
 
 from devokdev import __version__
+from devokdev.cli_models import models_app
 from devokdev.config import get_settings
 from devokdev.health.probes import default_checks
 from devokdev.health.runner import CheckResult, Status, exit_code, run_checks
@@ -28,6 +29,7 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+app.add_typer(models_app)
 console = Console()
 
 _STYLE = {Status.OK: "green", Status.WARN: "yellow", Status.FAIL: "red"}

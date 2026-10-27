@@ -5,8 +5,10 @@ assembles the roles the job needs, asks the questions a good team would ask, sho
 graph to approve, then designs, builds, tests, secures and documents the result while you watch
 and steer.
 
-> Status: **M0 — setup.** The foundation is in place: local stack, health checks, a durable
-> Temporal workflow, CI. Agents arrive from M2. See [docs/STATUS.md](docs/STATUS.md).
+> Status: **M1 — model router.** Every model call goes through Devo-K-Dev's own router: it
+> ranks free models per role, survives rate limits by handing a live conversation to another
+> provider, and measures what each model can do. Agents arrive in M2.
+> See [docs/STATUS.md](docs/STATUS.md).
 
 ## What makes it different
 
@@ -41,15 +43,23 @@ make setup        # Python 3.12, dependencies, git hooks, .env
 make up           # Temporal, PostgreSQL + pgvector, Redis
 make doctor       # every required check should say ok
 make smoke        # run a durable workflow end to end
+make demo         # watch the router survive a 429 mid-conversation (offline, no keys)
 make check        # lint, strict types, tests
+```
+
+With a free provider key in `.env` (see [docs/learning/M1.md](docs/learning/M1.md#getting-free-keys)):
+
+```bash
+uv run devokdev models chat "Explain durable execution in two lines" --simulate-429
+uv run devokdev models profile      # measure every model you have a key for
 ```
 
 Temporal's Web UI is at <http://127.0.0.1:8233>.
 
 ## Tech stack
 
-Python 3.12 (async) · Temporal · PostgreSQL 17 + pgvector · Redis · Typer · Pydantic ·
-structlog · uv · ruff · mypy (strict) · pytest + Hypothesis · GitHub Actions. React mission
+Python 3.12 (async) · Temporal · PostgreSQL 17 + pgvector · Redis (Lua scripts) · httpx ·
+Typer · Pydantic · structlog · uv · ruff · mypy (strict) · pytest + Hypothesis · GitHub Actions. React mission
 control arrives in M5. Decisions: [docs/adr/](docs/adr/).
 
 ## Repository
@@ -57,6 +67,7 @@ control arrives in M5. Decisions: [docs/adr/](docs/adr/).
 | Path | What it holds |
 | --- | --- |
 | `src/devokdev/` | The Python package |
+| `config/models.yaml` | Every provider and model the router may use |
 | `deploy/` | Docker Compose stack |
 | `tests/` | Unit and integration tests |
 | `docs/` | Design, architecture, decisions, status, learning notes |
