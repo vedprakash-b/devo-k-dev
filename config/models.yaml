@@ -1,0 +1,252 @@
+# Devo-K-Dev model registry: every provider and model the router may use.
+#
+# Edit this file to add a model, change a limit or fix a name. It is validated strictly
+# when loaded: `devokdev models list` (and `devokdev doctor`) tell you what is wrong.
+#
+# Sources, checked on 26 October 2026 (names and free limits change often):
+#   provider docs for Groq, Cerebras, Google AI Studio, Cloudflare and OpenRouter, and the
+#   free-llm-api-resources list (github.com/cheahjs/free-llm-api-resources).
+# `devokdev models discover` compares this file with what each provider serves today.
+#
+# Field guide
+#   tiers:     quality per role class, 0 (never) to 5 (best). These are starting guesses;
+#              the fitness check and evals replace them with measurements.
+#   limits:    free-tier limits per model (rpm, rph, rpd, tpm, tph, tpd). Unset = unknown;
+#              the router then learns from rate-limit headers and 429s.
+#   shared_limits (provider): limits shared by every model of that provider.
+#   trains_on_prompts: true means prompts may be used for training. Unknown is treated as
+#              true (ADR-008), so private code never reaches such a provider.
+
+version: 1
+
+# Each role maps to a role class; models carry one tier per class.
+roles:
+  orchestrator:   {class: reasoning}
+  analyst:        {class: reasoning}
+  architect:      {class: reasoning}
+  troubleshooter: {class: reasoning, needs: [tools]}
+  researcher:     {class: reasoning, needs: [tools], min_context: 100000}
+  frontend:       {class: coding, needs: [tools]}
+  backend:        {class: coding, needs: [tools]}
+  data_ml:        {class: coding, needs: [tools]}
+  devops:         {class: coding, needs: [tools]}
+  qa:             {class: coding, needs: [tools]}
+  git_release:    {class: coding, needs: [tools]}
+  reviewer:       {class: review, different_family: true}
+  security:       {class: review, needs: [tools], different_family: true}
+  ui_designer:    {class: vision, needs: [vision]}
+  scribe:         {class: light}
+  liaison:        {class: light}
+  intake:         {class: light, needs: [tools]}
+  writer:         {class: light}
+  summarizer:     {class: light}   # internal: compaction and probes' judge
+
+providers:
+  groq:
+    base_url: https://api.groq.com/openai/v1
+    key_setting: groq_api_key
+    trains_on_prompts: false
+    checked: 2026-10-26
+    # Groq's unsuffixed headers: requests are per day, tokens per minute.
+    rate_limit_headers: {bare_windows: {requests: day, tokens: minute}}
+    quirks: {tool_message_name: true}
+    models:
+      openai/gpt-oss-120b:
+        family: gpt-oss
+        context_window: 131072
+        max_output_tokens: 65536
+        tools: true
+        json_mode: true
+        tiers: {reasoning: 4, coding: 3, review: 3, light: 3}
+        limits: {rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
+      openai/gpt-oss-20b:
+        family: gpt-oss
+        context_window: 131072
+        max_output_tokens: 65536
+        tools: true
+        json_mode: true
+        tiers: {reasoning: 2, coding: 2, review: 2, light: 4}
+        limits: {rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
+      qwen/qwen3.8-27b:
+        family: qwen
+        context_window: 131072
+        max_output_tokens: 16384
+        tools: true
+        json_mode: true
+        tiers: {reasoning: 3, coding: 4, review: 3, light: 3}
+        limits: {rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
+      llama-3.3-70b-versatile:
+        family: llama
+        context_window: 131072
+        max_output_tokens: 32768
+        tools: true
+        json_mode: true
+        tiers: {reasoning: 2, coding: 2, review: 2, light: 3}
+        limits: {rpm: 30, rpd: 1000, tpm: 12000}
+      llama-3.1-8b-instant:
+        family: llama
+        context_window: 131072
+        max_output_tokens: 8192
+        tools: true
+        json_mode: true
+        tiers: {reasoning: 1, coding: 1, review: 1, light: 3}
+        limits: {rpm: 30, rpd: 14400, tpm: 6000}
+        notes: Fast and cheap; good for summaries, weak at anything else.
+
+  cerebras:
+    base_url: https://api.cerebras.ai/v1
+    key_setting: cerebras_api_key
+    trains_on_prompts: false
+    checked: 2026-10-26
+    # Cerebras puts the window in the header name (x-ratelimit-remaining-tokens-minute).
+    models:
+      gpt-oss-120b:
+        family: gpt-oss
+        context_window: 65536  # free tier; paid is 131k
+        max_output_tokens: 32768
+        tools: true
+        json_mode: true
+        tiers: {reasoning: 4, coding: 3, review: 3, light: 3}
+        limits: {rpm: 5, tpm: 30000, tph: 1000000, tpd: 1000000}
+      qwen-3.8-27b:
+        family: qwen
+        context_window: 64000  # free tier; paid is 128k
+        max_output_tokens: 16384
+        tools: true
+        json_mode: true
+        vision: true
+        tiers: {reasoning: 3, coding: 4, review: 3, vision: 2, light: 3}
+        limits: {rpm: 5, tpm: 30000, tph: 1000000, tpd: 1000000}
+
+  openrouter:
+    base_url: https://openrouter.ai/api/v1
+    key_setting: openrouter_api_key
+    # Free endpoints may log or train on prompts, depending on the upstream provider.
+    trains_on_prompts: true
+    checked: 2026-10-26
+    headers: {X-Title: Devo-K-Dev, HTTP-Referer: "https://github.com/vedprakash-b/devo-k-dev"}
+    # All free models share one quota: 20/min and 50/day (1,000/day after a $10 top-up).
+    shared_limits: {rpm: 20, rpd: 50}
+    rate_limit_headers: {bare_windows: {requests: minute}}
+    discovery_match: ":free$"
+    notes: Free model list changes weekly; run `devokdev models discover`.
+    models:
+      nvidia/nemotron-3-ultra-550b-a55b:free:
+        family: nemotron
+        context_window: 131072  # not yet verified
+        max_output_tokens: 16384
+        tools: true
+        json_mode: true
+        tiers: {reasoning: 5, coding: 3, review: 4, light: 2}
+      nvidia/nemotron-3-super-120b-a12b:free:
+        family: nemotron
+        context_window: 131072  # not yet verified
+        max_output_tokens: 16384
+        tools: true
+        json_mode: true
+        tiers: {reasoning: 4, coding: 3, review: 4, light: 3}
+      poolside/laguna-s-2.1:free:
+        family: laguna
+        context_window: 131072  # not yet verified
+        max_output_tokens: 16384
+        tools: true
+        tiers: {reasoning: 2, coding: 4, review: 2, light: 2}
+
+  google:
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    key_setting: google_api_key
+    # The free tier trains on prompts outside the UK, Switzerland and the EU, so in India.
+    trains_on_prompts: true
+    checked: 2026-10-26
+    models:
+      gemini-3.8-flash:
+        family: gemini
+        context_window: 1048576
+        max_output_tokens: 65536
+        tools: true
+        json_mode: true
+        vision: true
+        tiers: {reasoning: 4, coding: 4, review: 4, vision: 5, light: 3}
+        limits: {rpm: 5, rpd: 20, tpm: 250000}
+        notes: Only 20 requests a day; the router saves it for roles where it ranks first.
+      gemini-3.5-flash-lite:
+        family: gemini
+        context_window: 1048576
+        max_output_tokens: 65536
+        tools: true
+        json_mode: true
+        vision: true
+        tiers: {reasoning: 2, coding: 2, review: 3, vision: 3, light: 4}
+        limits: {rpm: 15, rpd: 500, tpm: 250000}
+      gemma-4-31b-it:
+        family: gemma
+        context_window: 131072  # not yet verified
+        max_output_tokens: 8192
+        tools: true
+        tiers: {reasoning: 2, coding: 2, review: 2, light: 3}
+        limits: {rpm: 30, rpd: 14400, tpm: 16000}
+        # Gemma on this endpoint has rejected system messages before; merging is harmless.
+        quirks: {system_prompt: merge_into_user}
+
+  mistral:
+    base_url: https://api.mistral.ai/v1
+    key_setting: mistral_api_key
+    # The free (Experiment) plan requires opting in to training.
+    trains_on_prompts: true
+    checked: 2026-10-26
+    notes: Limits are set per organisation; the router learns them from headers.
+    models:
+      codestral-latest:
+        family: mistral
+        context_window: 256000
+        max_output_tokens: 8192
+        tools: true
+        json_mode: true
+        tiers: {coding: 4, review: 2, light: 2}
+      mistral-small-latest:
+        family: mistral
+        context_window: 131072
+        max_output_tokens: 8192
+        tools: true
+        json_mode: true
+        vision: true
+        tiers: {reasoning: 2, coding: 2, review: 3, vision: 2, light: 3}
+
+  cloudflare:
+    base_url: https://api.cloudflare.com/client/v4/accounts/{cloudflare_account_id}/ai/v1
+    key_setting: cloudflare_api_token
+    trains_on_prompts: false
+    checked: 2026-10-26
+    discovery: false  # the OpenAI-compatible endpoint has no /models
+    quirks: {stream_usage: false}
+    notes: >-
+      Free tier is 10,000 neurons a day across all models; a large model uses that up in a
+      few dozen calls. The daily-allocation error is read as quota exhausted.
+    models:
+      "@cf/moonshotai/kimi-k2.7-code":
+        family: kimi
+        context_window: 131072  # not yet verified
+        max_output_tokens: 16384
+        tools: true
+        tiers: {reasoning: 3, coding: 5, review: 3, light: 2}
+      "@cf/zai-org/glm-5.2":
+        family: glm
+        context_window: 131072  # not yet verified
+        max_output_tokens: 16384
+        tools: true
+        tiers: {reasoning: 5, coding: 4, review: 4, light: 2}
+      "@cf/openai/gpt-oss-120b":
+        family: gpt-oss
+        context_window: 131072
+        max_output_tokens: 16384
+        tools: true
+        tiers: {reasoning: 4, coding: 3, review: 3, light: 2}
+
+  nvidia:
+    base_url: https://integrate.api.nvidia.com/v1
+    key_setting: nvidia_api_key
+    trains_on_prompts: true  # policy not checked yet: unknown counts as true
+    checked: 2026-10-26
+    shared_limits: {rpm: 40}
+    notes: No models listed yet. Run `devokdev models discover` and add the ones you want.
+    models: {}

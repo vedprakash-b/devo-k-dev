@@ -25,9 +25,11 @@ Temporal durable execution, routing model calls across free LLM providers.
 | Start / stop the local stack | `make up` / `make down` |
 | Health check | `make doctor` |
 | Temporal end-to-end check | `make smoke` |
+| Router demo (offline, no keys) | `make demo` |
+| Model registry and usable models | `make models` (or `uv run devokdev models list --role backend`) |
 | Format and auto-fix | `make fmt` |
 | Everything CI runs | `make check` (ruff, ruff format, mypy strict, pytest) |
-| Integration tests | `make up && make test-integration` |
+| Integration tests (everything marked `integration`) | `make up && make test-integration` |
 
 A change is done only when `make check` passes. Add or update tests with every behaviour change.
 
@@ -36,19 +38,23 @@ A change is done only when `make check` passes. Add or update tests with every b
 ```
 src/devokdev/
   config.py        typed settings (DEVOKDEV_* env vars, .env)
-  cli.py           Typer CLI: version, doctor, smoke
+  cli.py           Typer CLI: version, doctor, smoke; cli_models.py: `models` commands
   health/          doctor checks: runner (timeouts, redaction) and probes
+  llm/             canonical messages, registry, streaming adapter, errors, rate-limit headers
+  router/          policy, quota/health state (memory + Redis Lua), gateway, router sessions
+  fitness/         model discovery, probes, sandbox for model-written code, cached profiles
   workflows/       Temporal workflows (deterministic code only)
   activities/      Temporal activities (all I/O and side effects)
   runtime/         processes that host workers and start workflows
   telemetry/       structured logging
+config/models.yaml every provider and model the router may use; validated on load
 deploy/            docker-compose stack and Postgres init scripts
 tests/unit/        fast tests, no network except Temporal's test server download
-tests/integration/ need `make up`; run with --run-integration
+tests/integration/ need `make up`; tests marked `integration` anywhere run with --run-integration
 docs/              ARCHITECTURE.md, STATUS.md, adr/, learning/
 ```
 
-Later milestones add `orchestrator/`, `agents/`, `router/`, `llm/`, `memory/`, `sandbox/` and
+Later milestones add `orchestrator/`, `agents/`, `context/`, `memory/`, `sandbox/` and
 more; see `docs/ARCHITECTURE.md`. Do not create them before their milestone.
 
 ## Conventions
@@ -60,6 +66,11 @@ more; see `docs/ARCHITECTURE.md`. Do not create them before their milestone.
 - Settings come only from `devokdev.config.Settings`. Secrets are `SecretStr` and are
   unwrapped only where used. Never log or print a secret.
 - Errors are reported, not swallowed: a failing check or task returns a readable reason.
+- Every model call goes through `router` (or, for a named model, `router.gateway.Gateway`),
+  never straight to a provider, so quota, health and decisions are recorded.
+- Tests never call real providers: use `devokdev.llm.scripted.ScriptedTransport`.
+- Router state has two implementations; a behaviour change goes into both and into
+  `tests/unit/router/test_state_contract.py`.
 - Conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `ci:`); every change goes
   through a pull request into `main`.
 - New decisions get a row in the design doc's Decision log and an ADR in `docs/adr/` once accepted.

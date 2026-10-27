@@ -8,6 +8,7 @@ Secrets are ``SecretStr``: they print as '**********' and must be unwrapped with
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from psycopg.conninfo import make_conninfo
@@ -66,6 +67,17 @@ class Settings(BaseSettings):
     cloudflare_api_token: SecretStr | None = None
     cloudflare_account_id: str | None = None
     nvidia_api_key: SecretStr | None = None
+
+    # Model registry, router and fitness check (M1)
+    models_file: Path = Path("config/models.yaml")
+    data_dir: Path = Path(".devokdev")  # local caches such as fitness profiles; git-ignored
+    router_first_token_timeout_s: float = Field(default=30.0, gt=0)
+    router_stall_timeout_s: float = Field(default=60.0, gt=0)
+    router_total_timeout_s: float = Field(default=300.0, gt=0)
+    router_max_attempts: int = Field(default=6, ge=1, le=20)
+    router_breaker_failures: int = Field(default=3, ge=1)
+    router_breaker_cooldown_s: float = Field(default=60.0, gt=0)
+    router_switch_back_after_s: float = Field(default=120.0, ge=0)
 
     def postgres_conninfo(self) -> str:
         """A libpq connection string. make_conninfo quotes special characters safely."""
