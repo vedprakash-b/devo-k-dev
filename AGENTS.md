@@ -73,7 +73,7 @@ more; see `docs/ARCHITECTURE.md`. Do not create them before their milestone.
   `tests/unit/router/test_state_contract.py`.
 - Conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `ci:`); every change goes
   through a pull request into `main`.
-- New decisions get a row in the design doc's Decision log and an ADR in `docs/adr/` once accepted.
+- New decisions get an ADR in `docs/adr/` and a row in its index.
 
 ## Do not
 

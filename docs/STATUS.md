@@ -1,6 +1,6 @@
 # Status
 
-Mirrors the Status section of the design doc. Updated at the end of every session.
+Updated at the end of every milestone.
 
 | Milestone | Status |
 | --- | --- |
@@ -24,9 +24,9 @@ Mirrors the Status section of the design doc. Updated at the end of every sessio
       decision log; a 429 mid-conversation is survived (unit test and `make demo`)
 - [x] Fitness check: discovery, five probes, hardened sandbox for the code fix, cached profiles
 - [x] `devokdev models list / discover / profile / chat / demo`; registry check in `doctor`
-- [x] Walkthrough `docs/learning/M1.md`; ADRs; architecture and agent guide updated
-- [ ] Ved creates free keys and runs `models discover`, `models profile` and
-      `models chat --simulate-429` on his machine
+- [x] Design notes `docs/learning/M1.md`; ADRs; architecture and agent guide updated
+- [ ] Run `models discover`, `models profile` and `models chat --simulate-429` against
+      real free-tier provider keys
 - [ ] The M1 pull request is green on GitHub (including Redis and sandbox integration tests)
 
 ## M0 done when (finished 2026-10-22)
@@ -35,6 +35,6 @@ Mirrors the Status section of the design doc. Updated at the end of every sessio
 - [x] Local stack: Temporal, PostgreSQL + pgvector, Redis
 - [x] `devokdev doctor` and `devokdev smoke`
 - [x] CI: lint, types, unit tests, integration tests on the real stack, secret scan, dependency audit
-- [x] AGENTS.md, Copilot pointer, design export, ADRs, M0 walkthrough
-- [x] Ved runs it on his machine: `make doctor` all ok, `make smoke` succeeds
+- [x] AGENTS.md, Copilot pointer, ADRs, M0 design notes
+- [x] Runs on a fresh WSL2 machine: `make doctor` all ok, `make smoke` succeeds
 - [x] `uv.lock` generated and committed; first pull request green on GitHub

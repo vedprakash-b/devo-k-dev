@@ -15,7 +15,7 @@ from psycopg.conninfo import make_conninfo
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Free model providers from the design doc. M1 (the router) reads these; M0 only
+# Free model providers the router can use. M1 (the router) reads these; M0 only
 # reports which ones are configured.
 PROVIDER_KEY_FIELDS: tuple[str, ...] = (
     "groq_api_key",
